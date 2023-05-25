@@ -27,6 +27,20 @@ var pq_user = os.Getenv("pq_user")
 var pq_password = os.Getenv("pq_password")
 
 func main() {
+
+	if mysql_user == "" {
+		panic("mysql user not set")
+	}
+	if mysql_password == "" {
+		panic("mysql password not set")
+	}
+	if pq_user == "" {
+		panic("pqsl user not set")
+	}
+	if pq_password == "" {
+		panic("pqsl password not set")
+	}
+
 	pos, err := readPos()
 	check(err)
 

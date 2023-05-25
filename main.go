@@ -15,15 +15,16 @@ const (
 	flavor         = "mysql"
 	mysql_host     = "127.0.0.1"
 	mysql_port     = 3306
-	mysql_user     = "root"
-	mysql_password = "k4aTJCcB4j=+"
 
 	pq_host      = "localhost"
 	pq_port      = 5432
-	pq_user      = "postgres"
-	pq_password  = "k4aTJCcB4j=+"
 	pq_defaultDB = "postgres"
 )
+
+var mysql_user = os.Getenv("mysql_user")
+var mysql_password = os.Getenv("mysql_password")
+var pq_user = os.Getenv("pq_user")
+var pq_password = os.Getenv("pq_password")
 
 func main() {
 	pos, err := readPos()

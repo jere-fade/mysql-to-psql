@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/lib/pq"
@@ -13,8 +14,17 @@ type PsqlConn struct {
 	pq_dbname string
 }
 
+var adminPsqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+	pq_host,
+	pq_port,
+	pq_user,
+	pq_password,
+	pq_defaultDB,
+)
+
 func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 	schema := string(qe.Schema)
+	query := string(qe.Query)
 	if schema == "" {
 		return nil
 	}
@@ -45,18 +55,17 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 					// database not exist in pqsl
 					// create new database using default user postgres
 					pc.Close()
-					adminPsqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-						pq_host,
-						pq_port,
-						pq_user,
-						pq_password,
-						pq_defaultDB,
-					)
+
 					adminPsql, err := sql.Open("postgres", adminPsqlconn)
 					if err != nil {
 						return err
 					}
-					_, err = adminPsql.Exec("create database " + schema)
+
+					if strings.Contains(strings.ToLower(query), "create database") {
+						_, err = adminPsql.Exec(query)
+					} else {
+						_, err = adminPsql.Exec("create database " + schema)
+					}
 					if err != nil {
 						return err
 					}
@@ -86,6 +95,41 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 	}
 
 	// process the query
+	// if query contain create database, skip
+
+	if strings.Contains(strings.ToLower(query), "create database") {
+		return nil
+	} else if strings.Contains(strings.ToLower(query), "drop database") {
+		pc.Close()
+		adminPsql, err := sql.Open("postgres", adminPsqlconn)
+		if err != nil {
+			return err
+		}
+		_, err = adminPsql.Exec(query)
+		if err != nil {
+			return err
+		}
+		adminPsql.Close()
+
+		pc.pq_dbname = pq_defaultDB
+		psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+			pq_host,
+			pq_port,
+			pq_user,
+			pq_password,
+			pc.pq_dbname,
+		)
+		pc.conn, err = sql.Open("postgres", psqlconn)
+		if err != nil {
+			return err
+		}
+		err = pc.Ping()
+		if err != nil {
+			return err
+		}
+	} else if strings.Contains(strings.ToLower(query), "table") {
+		return nil
+	}
 
 	return nil
 }

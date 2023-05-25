@@ -35,10 +35,10 @@ func main() {
 		panic("mysql password not set")
 	}
 	if pq_user == "" {
-		panic("pqsl user not set")
+		panic("psql user not set")
 	}
 	if pq_password == "" {
-		panic("pqsl password not set")
+		panic("psql password not set")
 	}
 
 	pos, err := readPos()

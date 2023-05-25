@@ -3,15 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/lib/pq"
-
-	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 )
 
@@ -23,29 +18,15 @@ const (
 	mysql_user     = "root"
 	mysql_password = "k4aTJCcB4j=+"
 
-	pq_host     = "localhost"
-	pq_port     = 5432
-	pq_user     = "postgres"
-	pq_password = "k4aTJCcB4j=+"
+	pq_host      = "localhost"
+	pq_port      = 5432
+	pq_user      = "postgres"
+	pq_password  = "k4aTJCcB4j=+"
+	pq_defaultDB = "postgres"
 )
 
-var pq_dbname = "postgres"
-
 func main() {
-	fileName := "replication.conf"
-
-	if _, err := os.Stat(fileName); errors.Is(err, os.ErrNotExist) {
-		initial := &mysql.Position{Name: "binlog.000001", Pos: 0}
-		content, err := json.MarshalIndent(initial, "", "\t")
-		check(err)
-		err = os.WriteFile(fileName, content, 0644)
-		check(err)
-	}
-
-	data, err := os.ReadFile(fileName)
-	check(err)
-	pos := mysql.Position{}
-	err = json.Unmarshal(data, &pos)
+	pos, err := readPos()
 	check(err)
 
 	// Create a binlog syncer with a unique server id, the server id must be different from other MySQL's.
@@ -62,7 +43,7 @@ func main() {
 	nextPos := syncer.GetNextPosition()
 
 	// Start sync with specified binlog file and position
-	streamer, _ := syncer.StartSync(pos)
+	streamer, _ := syncer.StartSync(*pos)
 
 	// psql connection
 	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
@@ -70,10 +51,11 @@ func main() {
 		pq_port,
 		pq_user,
 		pq_password,
-		pq_dbname,
+		pq_defaultDB,
 	)
 
-	psql, err := sql.Open("postgres", psqlconn)
+	psql := &PsqlConn{pq_dbname: pq_defaultDB}
+	psql.conn, err = sql.Open("postgres", psqlconn)
 	check(err)
 	defer psql.Close()
 
@@ -99,80 +81,22 @@ func main() {
 				fmt.Println("--query event--")
 				fmt.Printf("schema: %s\n", qe.Schema)
 				fmt.Printf("query: %s\n", qe.Query)
-				schema := string(qe.Schema)
-				if schema == "" {
-					continue
-				}
-
-				if pq_dbname != schema {
-					psql.Close()
-					// close old connection, create new connection to psql using 'schema'
-					pq_dbname = schema
-					psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-						pq_host,
-						pq_port,
-						pq_user,
-						pq_password,
-						pq_dbname,
-					)
-					psql, err = sql.Open("postgres", psqlconn)
-					check(err)
-					defer psql.Close()
-
-					// check if new schema exists, if not, create it
-					err = psql.Ping()
-					if err != nil {
-						if pqerr, ok := err.(*pq.Error); ok {
-							if pqerr.Code == "3D000" {
-								// database not exist in pqsl
-								// create new database using default user postgres
-								psql.Close()
-								pq_dbname = "postgres"
-								psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-									pq_host,
-									pq_port,
-									pq_user,
-									pq_password,
-									pq_dbname,
-								)
-								psql, err = sql.Open("postgres", psqlconn)
-								check(err)
-								defer psql.Close()
-								_, err = psql.Exec("create database " + schema)
-								check(err)
-								psql.Close()
-
-								// connect to the new created database
-								pq_dbname = schema
-								psqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-									pq_host,
-									pq_port,
-									pq_user,
-									pq_password,
-									pq_dbname,
-								)
-								psql, err = sql.Open("postgres", psqlconn)
-								check(err)
-								defer psql.Close()
-
-								pingErr := psql.Ping()
-								check(pingErr)
-							} else {
-								panic(pqerr)
-							}
-						}
-					}
-				} else {
-					// use current connection
-					pingErr := psql.Ping()
-					check(pingErr)
-				}
+				err = psql.processQuery(qe)
+				check(err)
 			}
 		case replication.TABLE_MAP_EVENT:
 			if tme, ok := ev.Event.(*replication.TableMapEvent); ok {
 				fmt.Println("--table map event--")
 				fmt.Printf("table: %s\n", tme.Table)
 				fmt.Printf("schema: %s\n", tme.Schema)
+				fmt.Printf("column count: %d\n", tme.ColumnCount)
+				columnName := tme.ColumnNameString()
+				if columnName == nil {
+					fmt.Println("fuck")
+				}
+				for i, name := range columnName {
+					fmt.Printf("column name: %d %s\n", i, name)
+				}
 			}
 		case replication.WRITE_ROWS_EVENTv0,
 			replication.UPDATE_ROWS_EVENTv0,
@@ -186,14 +110,14 @@ func main() {
 			if re, ok := ev.Event.(*replication.RowsEvent); ok {
 				fmt.Println("--rows event--")
 				fmt.Printf("version: %d\n", re.Version)
+				fmt.Printf("table: %s\n", re.Table.Table)
 			}
 		}
 	}
 
-	content, err := json.MarshalIndent(nextPos, "", "\t")
+	err = writePos(nextPos)
 	check(err)
-	err = os.WriteFile(fileName, content, 0644)
-	check(err)
+
 }
 
 func check(e error) {

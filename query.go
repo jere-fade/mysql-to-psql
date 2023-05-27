@@ -25,13 +25,15 @@ var adminPsqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s s
 func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 	schema := string(qe.Schema)
 	query := string(qe.Query)
+	query = strings.ReplaceAll(query, "`", "")
+
 	if schema == "" {
 		return nil
 	}
 
 	// check if current connection is connected to the given schema
 	if pc.pq_dbname != schema {
-		pc.Close()
+		pc.conn.Close()
 		// close old connection, create new connection to psql using 'schema'
 		pc.pq_dbname = schema
 		psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
@@ -48,13 +50,13 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 		}
 
 		// check if new schema exists, if not, create it
-		err = pc.Ping()
+		err = pc.conn.Ping()
 		if err != nil {
 			if pqerr, ok := err.(*pq.Error); ok {
 				if pqerr.Code == "3D000" {
 					// database not exist in pqsl
 					// create new database using default user postgres
-					pc.Close()
+					pc.conn.Close()
 
 					adminPsql, err := sql.Open("postgres", adminPsqlconn)
 					if err != nil {
@@ -77,7 +79,7 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 						return err
 					}
 
-					pingErr := pc.Ping()
+					pingErr := pc.conn.Ping()
 					if pingErr != nil {
 						return pingErr
 					}
@@ -88,7 +90,7 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 		}
 	} else {
 		// use current connection
-		pingErr := pc.Ping()
+		pingErr := pc.conn.Ping()
 		if pingErr != nil {
 			return pingErr
 		}
@@ -96,11 +98,15 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 
 	// process the query
 	// if query contain create database, skip
+	queryLower := strings.ToLower(query)
 
-	if strings.Contains(strings.ToLower(query), "create database") {
+	if strings.Contains(queryLower, "create database") {
+
 		return nil
-	} else if strings.Contains(strings.ToLower(query), "drop database") {
-		pc.Close()
+
+	} else if strings.Contains(queryLower, "drop database") {
+
+		pc.conn.Close()
 		adminPsql, err := sql.Open("postgres", adminPsqlconn)
 		if err != nil {
 			return err
@@ -123,21 +129,38 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 		if err != nil {
 			return err
 		}
-		err = pc.Ping()
+		err = pc.conn.Ping()
 		if err != nil {
 			return err
 		}
-	} else if strings.Contains(strings.ToLower(query), "table") {
+
+	} else if strings.Contains(queryLower, "create table") {
+
+		pqQuery, err := parseCreateTable(query)
+
+		if err != nil {
+			return err
+		}
+
+		_, err = pc.conn.Exec(pqQuery)
+		if err != nil {
+			return err
+		}
+
+	} else if strings.Contains(queryLower, "drop table") {
+
+		_, err := pc.conn.Exec(query)
+		if err != nil {
+			return err
+		}
+
+	} else {
 		return nil
 	}
 
 	return nil
 }
 
-func (pc *PsqlConn) Close() error {
-	return pc.conn.Close()
-}
-
-func (pc *PsqlConn) Ping() error {
-	return pc.conn.Ping()
+func parseCreateTable(sqlQuery string) (string, error) {
+	return sqlQuery, nil
 }

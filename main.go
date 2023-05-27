@@ -29,16 +29,16 @@ var pq_password = os.Getenv("pq_password")
 func main() {
 
 	if mysql_user == "" {
-		panic("mysql user not set")
+		panic("mysql_user not set")
 	}
 	if mysql_password == "" {
-		panic("mysql password not set")
+		panic("mysql_password not set")
 	}
 	if pq_user == "" {
-		panic("psql user not set")
+		panic("pq_user not set")
 	}
 	if pq_password == "" {
-		panic("psql password not set")
+		panic("pq_password not set")
 	}
 
 	pos, err := readPos()
@@ -55,7 +55,7 @@ func main() {
 		Password: mysql_password,
 	}
 	syncer := replication.NewBinlogSyncer(cfg)
-	nextPos := syncer.GetNextPosition()
+	// nextPos := syncer.GetNextPosition()
 
 	// Start sync with specified binlog file and position
 	streamer, _ := syncer.StartSync(*pos)
@@ -72,7 +72,7 @@ func main() {
 	psql := &PsqlConn{pq_dbname: pq_defaultDB}
 	psql.conn, err = sql.Open("postgres", psqlconn)
 	check(err)
-	defer psql.Close()
+	defer psql.conn.Close()
 
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -85,14 +85,14 @@ func main() {
 
 		ev.Dump(os.Stdout)
 		switch ev.Header.EventType {
-		case replication.ROTATE_EVENT:
-			if re, ok := ev.Event.(*replication.RotateEvent); ok {
-				nextPos.Name = string(re.NextLogName)
-				nextPos.Pos = uint32(re.Position)
-			}
+		// case replication.ROTATE_EVENT:
+		// 	if re, ok := ev.Event.(*replication.RotateEvent); ok {
+		// 		nextPos.Name = string(re.NextLogName)
+		// 		nextPos.Pos = uint32(re.Position)
+		// 	}
 		case replication.QUERY_EVENT:
 			if qe, ok := ev.Event.(*replication.QueryEvent); ok {
-				nextPos.Pos = ev.Header.LogPos
+				// nextPos.Pos = ev.Header.LogPos
 				fmt.Println("--query event--")
 				fmt.Printf("schema: %s\n", qe.Schema)
 				fmt.Printf("query: %s\n", qe.Query)
@@ -105,13 +105,6 @@ func main() {
 				fmt.Printf("table: %s\n", tme.Table)
 				fmt.Printf("schema: %s\n", tme.Schema)
 				fmt.Printf("column count: %d\n", tme.ColumnCount)
-				columnName := tme.ColumnNameString()
-				if columnName == nil {
-					fmt.Println("fuck")
-				}
-				for i, name := range columnName {
-					fmt.Printf("column name: %d %s\n", i, name)
-				}
 			}
 		case replication.WRITE_ROWS_EVENTv0,
 			replication.UPDATE_ROWS_EVENTv0,
@@ -130,6 +123,7 @@ func main() {
 		}
 	}
 
+	nextPos := syncer.GetNextPosition()
 	err = writePos(nextPos)
 	check(err)
 

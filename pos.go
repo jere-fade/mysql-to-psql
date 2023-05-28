@@ -12,7 +12,7 @@ const fileName = "replication.conf"
 
 func readPos() (*mysql.Position, error) {
 	if _, err := os.Stat(fileName); errors.Is(err, os.ErrNotExist) {
-		initial := mysql.Position{Name: "binlog.000001", Pos: 0}
+		initial := mysql.Position{Name: "", Pos: 0}
 		content, err := json.MarshalIndent(initial, "", "\t")
 		if err != nil {
 			return nil, err

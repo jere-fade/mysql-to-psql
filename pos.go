@@ -21,6 +21,7 @@ func readPos() (*mysql.Position, error) {
 		if err != nil {
 			return nil, err
 		}
+		return nil, errors.New("replication.conf not found, please set correct binlog file position in it")
 	}
 	data, err := os.ReadFile(fileName)
 	if err != nil {

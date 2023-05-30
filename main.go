@@ -93,56 +93,31 @@ func main() {
 		case replication.QUERY_EVENT:
 			if qe, ok := ev.Event.(*replication.QueryEvent); ok {
 				// nextPos.Pos = ev.Header.LogPos
-				fmt.Println("--query event--")
-				fmt.Printf("schema: %s\n", qe.Schema)
-				fmt.Printf("query: %s\n", qe.Query)
 				err = psql.processQuery(qe)
 				check(err)
 			}
-		case replication.TABLE_MAP_EVENT:
-			if tme, ok := ev.Event.(*replication.TableMapEvent); ok {
-				fmt.Println("--table map event--")
-				fmt.Printf("table: %s\n", tme.Table)
-				fmt.Printf("schema: %s\n", tme.Schema)
-				fmt.Printf("column count: %d\n", tme.ColumnCount)
-			}
+		// case replication.TABLE_MAP_EVENT:
+		// 	if tme, ok := ev.Event.(*replication.TableMapEvent); ok {
+
+		// 	}
 		case replication.WRITE_ROWS_EVENTv0,
-			replication.UPDATE_ROWS_EVENTv0,
-			replication.DELETE_ROWS_EVENTv0,
 			replication.WRITE_ROWS_EVENTv1,
+			replication.WRITE_ROWS_EVENTv2:
+			if re, ok := ev.Event.(*replication.RowsEvent); ok {
+				err = psql.processWriteRow(re)
+				check(err)
+			}
+		case replication.DELETE_ROWS_EVENTv0,
 			replication.DELETE_ROWS_EVENTv1,
-			replication.UPDATE_ROWS_EVENTv1,
-			replication.WRITE_ROWS_EVENTv2,
-			replication.UPDATE_ROWS_EVENTv2,
 			replication.DELETE_ROWS_EVENTv2:
 			if re, ok := ev.Event.(*replication.RowsEvent); ok {
-				fmt.Println("--rows event--")
-				fmt.Printf("version: %d\n", re.Version)
-				fmt.Printf("table: %s\n", re.Table.Table)
-				// fmt.Printf("columnNameString: ")
-				// columnNameString := re.Table.ColumnName
-				// for i := 0; i < len(columnNameString); i++ {
-				// 	fmt.Print(columnNameString[i], ", ")
-				// }
-				// fmt.Println()
-				fmt.Printf("Schema: %s\n", re.Table.Schema)
-				// fmt.Printf("ExtraData: %s\n", re.ExtraData)
-				fmt.Printf("ColumnBitmap1: ")
-				for i := 0; i < len(re.ColumnBitmap1); i++ {
-					fmt.Print(re.ColumnBitmap1[i])
-				}
-				fmt.Println()
-				fmt.Printf("Rows: \n")
-				for i := 0; i < len(re.Rows); i++ {
-					for j := 0; j < len(re.Rows[i]); j++ {
-						fmt.Print(re.Rows[i][j], ", ")
-					}
-					fmt.Println()
-				}
-				for i := 0; i < len(re.Table.DefaultCharset); i++ {
-					fmt.Print("DefaultCharset", re.Table.DefaultCharset[i], ", ")
-				}
-				fmt.Println()
+				err = psql.processWriteRow(re)
+				check(err)
+			}
+		case replication.UPDATE_ROWS_EVENTv0,
+			replication.UPDATE_ROWS_EVENTv1,
+			replication.UPDATE_ROWS_EVENTv2:
+			if re, ok := ev.Event.(*replication.RowsEvent); ok {
 				err = psql.processWriteRow(re)
 				check(err)
 			}

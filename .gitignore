@@ -1,2 +1,4 @@
 replication.conf
 run.sh
+create-tables.sql
+setenv.sh

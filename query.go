@@ -1,12 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/lib/pq"
+
+	"github.com/pingcap/tidb/parser"
+	"github.com/pingcap/tidb/parser/ast"
+	"github.com/pingcap/tidb/parser/format"
+	_ "github.com/pingcap/tidb/parser/test_driver"
 )
 
 type PsqlConn struct {
@@ -161,6 +167,39 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 	return nil
 }
 
+func parse(sql string) (*ast.StmtNode, error) {
+	p := parser.New()
+
+	stmtNodes, _, err := p.Parse(sql, "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	return &stmtNodes[0], nil
+}
+
 func parseCreateTable(sqlQuery string) (string, error) {
+	astNode, err := parse(sqlQuery)
+	if err != nil {
+		return "", err
+	}
+
+	if ct, ok := (*astNode).(*ast.CreateTableStmt); ok {
+		for _, col := range ct.Cols {
+			i := 0
+			for _, op := range col.Options {
+				if op.Tp != ast.ColumnOptionAutoIncrement {
+					col.Options[i] = op
+					i += 1
+				}
+			}
+			col.Options = col.Options[:i]
+		}
+		buf := new(bytes.Buffer)
+		ctx := format.NewRestoreCtx(format.RestoreStringSingleQuotes, buf)
+		ct.Restore(ctx)
+		return buf.String(), nil
+	}
+
 	return sqlQuery, nil
 }

@@ -119,14 +119,14 @@ func main() {
 				fmt.Println("--rows event--")
 				fmt.Printf("version: %d\n", re.Version)
 				fmt.Printf("table: %s\n", re.Table.Table)
-				fmt.Printf("columnNameString: ")
-				columnNameString := re.Table.ColumnName
-				for i := 0; i < len(columnNameString); i++ {
-					fmt.Print(columnNameString[i], ", ")
-				}
-				fmt.Println()
+				// fmt.Printf("columnNameString: ")
+				// columnNameString := re.Table.ColumnName
+				// for i := 0; i < len(columnNameString); i++ {
+				// 	fmt.Print(columnNameString[i], ", ")
+				// }
+				// fmt.Println()
 				fmt.Printf("Schema: %s\n", re.Table.Schema)
-				fmt.Printf("ExtraData: %s\n", re.ExtraData)
+				// fmt.Printf("ExtraData: %s\n", re.ExtraData)
 				fmt.Printf("ColumnBitmap1: ")
 				for i := 0; i < len(re.ColumnBitmap1); i++ {
 					fmt.Print(re.ColumnBitmap1[i])
@@ -139,6 +139,10 @@ func main() {
 					}
 					fmt.Println()
 				}
+				for i := 0; i < len(re.Table.DefaultCharset); i++ {
+					fmt.Print("DefaultCharset", re.Table.DefaultCharset[i], ", ")
+				}
+				fmt.Println()
 				err = psql.processWriteRow(re)
 				check(err)
 			}

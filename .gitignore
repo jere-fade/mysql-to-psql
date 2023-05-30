@@ -1,5 +1,5 @@
 replication.conf
 run.sh
 setenv.ps1
-writeTest.sql
-writeTest.ps1
+test/*
+test.go

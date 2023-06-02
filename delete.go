@@ -25,8 +25,9 @@ func (pc *PsqlConn) processDeleteRow(re *replication.RowsEvent) error {
 		columnNames = append(columnNames, columnName)
 	}
 
-	deleteSql := fmt.Sprintf("DELETE FROM %s WHERE", tableName)
+	baseSql := fmt.Sprintf("DELETE FROM %s WHERE", tableName)
 	for _, row := range re.Rows {
+		deleteSql := baseSql
 		for i, column := range row {
 			var condition string
 			switch column.(type) {
@@ -41,11 +42,10 @@ func (pc *PsqlConn) processDeleteRow(re *replication.RowsEvent) error {
 				deleteSql += " AND"
 			}
 		}
-	}
-
-	_, err = pc.conn.Exec(deleteSql)
-	if err != nil {
-		return err
+		_, err = pc.conn.Exec(deleteSql)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

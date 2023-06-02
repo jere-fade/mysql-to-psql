@@ -111,14 +111,14 @@ func main() {
 			replication.DELETE_ROWS_EVENTv1,
 			replication.DELETE_ROWS_EVENTv2:
 			if re, ok := ev.Event.(*replication.RowsEvent); ok {
-				err = psql.processWriteRow(re)
+				err = psql.processDeleteRow(re)
 				check(err)
 			}
 		case replication.UPDATE_ROWS_EVENTv0,
 			replication.UPDATE_ROWS_EVENTv1,
 			replication.UPDATE_ROWS_EVENTv2:
 			if re, ok := ev.Event.(*replication.RowsEvent); ok {
-				err = psql.processWriteRow(re)
+				err = psql.processUpdateRow(re)
 				check(err)
 			}
 		}

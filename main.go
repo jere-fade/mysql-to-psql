@@ -83,7 +83,7 @@ func main() {
 			break
 		}
 
-		ev.Dump(os.Stdout)
+		// ev.Dump(os.Stdout)
 		switch ev.Header.EventType {
 		// case replication.ROTATE_EVENT:
 		// 	if re, ok := ev.Event.(*replication.RotateEvent); ok {

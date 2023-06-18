@@ -2,3 +2,6 @@ replication.conf
 run.sh
 create-tables.sql
 setenv.sh
+create.sql
+.gitignore
+update.sql

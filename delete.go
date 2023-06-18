@@ -42,6 +42,7 @@ func (pc *PsqlConn) processDeleteRow(re *replication.RowsEvent) error {
 				deleteSql += " AND"
 			}
 		}
+		fmt.Println(deleteSql)
 		_, err = pc.conn.Exec(deleteSql)
 		if err != nil {
 			return err

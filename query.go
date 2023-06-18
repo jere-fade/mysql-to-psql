@@ -32,6 +32,7 @@ func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
 	schema := string(qe.Schema)
 	query := string(qe.Query)
 	query = strings.ReplaceAll(query, "`", "")
+	fmt.Println(query)
 
 	if schema == "" {
 		return nil

@@ -4,15 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-
-	"github.com/go-mysql-org/go-mysql/mysql"
 )
+
+type Position struct {
+	Name string
+	Pos  uint32
+}
 
 const fileName = "replication.conf"
 
-func readPos() (*mysql.Position, error) {
+func readPos() (*Position, error) {
 	if _, err := os.Stat(fileName); errors.Is(err, os.ErrNotExist) {
-		initial := mysql.Position{Name: "", Pos: 0}
+		initial := Position{Name: "binlog.000001", Pos: 0}
 		content, err := json.MarshalIndent(initial, "", "\t")
 		if err != nil {
 			return nil, err
@@ -27,7 +30,7 @@ func readPos() (*mysql.Position, error) {
 	if err != nil {
 		return nil, err
 	}
-	pos := &mysql.Position{}
+	pos := &Position{}
 	err = json.Unmarshal(data, pos)
 	if err != nil {
 		return nil, err
@@ -35,7 +38,7 @@ func readPos() (*mysql.Position, error) {
 	return pos, nil
 }
 
-func writePos(nextPos mysql.Position) error {
+func writePos(nextPos Position) error {
 	content, err := json.MarshalIndent(nextPos, "", "\t")
 	if err != nil {
 		return err

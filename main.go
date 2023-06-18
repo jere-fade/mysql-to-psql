@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 )
 
@@ -44,6 +45,9 @@ func main() {
 	pos, err := readPos()
 	check(err)
 
+	err = syncLog(*pos)
+	check(err)
+
 	// Create a binlog syncer with a unique server id, the server id must be different from other MySQL's.
 	// flavor is mysql or mariadb
 	cfg := replication.BinlogSyncerConfig{
@@ -58,7 +62,8 @@ func main() {
 	// nextPos := syncer.GetNextPosition()
 
 	// Start sync with specified binlog file and position
-	streamer, _ := syncer.StartSync(*pos)
+	// streamer, _ := syncer.StartSync(*pos)
+	streamer, _ := syncer.StartSync(mysql.Position{Name: pos.Name, Pos: pos.Pos})
 
 	// psql connection
 	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
@@ -125,7 +130,8 @@ func main() {
 	}
 
 	nextPos := syncer.GetNextPosition()
-	err = writePos(nextPos)
+	// err = writePos(nextPos)
+	err = writePos(Position{Name: nextPos.Name, Pos: nextPos.Pos})
 	check(err)
 
 }

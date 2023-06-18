@@ -5,3 +5,5 @@ setenv.sh
 create.sql
 .gitignore
 update.sql
+test/*
+setenv.ps1

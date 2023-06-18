@@ -46,7 +46,7 @@ func main() {
 		Port:     mysql_port,
 		User:     mysql_user,
 		Password: mysql_password,
-		tables:   make(map[uint32]*TableMapEvent),
+		tables:   make(map[uint64]*TableMapEvent),
 	}
 
 	err = syncer.syncLog()
@@ -99,42 +99,40 @@ func main() {
 		// 	}
 		case QUERY_EVENT:
 			if qe, ok := ev.Event.(*QueryEvent); ok {
-				// err = psql.processQuery(qe)
-				fmt.Println(string(qe.Schema))
-				fmt.Println(string(qe.Query))
+				err = psql.processQuery(qe)
 				check(err)
 			}
-			// case replication.TABLE_MAP_EVENT:
-			// 	if tme, ok := ev.Event.(*replication.TableMapEvent); ok {
+		// case replication.TABLE_MAP_EVENT:
+		// 	if tme, ok := ev.Event.(*replication.TableMapEvent); ok {
 
-			// 	}
-			// case replication.WRITE_ROWS_EVENTv0,
-			// 	replication.WRITE_ROWS_EVENTv1,
-			// 	replication.WRITE_ROWS_EVENTv2:
-			// 	if re, ok := ev.Event.(*replication.RowsEvent); ok {
-			// 		err = psql.processWriteRow(re)
-			// 		check(err)
-			// 	}
-			// case replication.DELETE_ROWS_EVENTv0,
-			// 	replication.DELETE_ROWS_EVENTv1,
-			// 	replication.DELETE_ROWS_EVENTv2:
-			// 	if re, ok := ev.Event.(*replication.RowsEvent); ok {
-			// 		err = psql.processDeleteRow(re)
-			// 		check(err)
-			// 	}
-			// case replication.UPDATE_ROWS_EVENTv0,
-			// 	replication.UPDATE_ROWS_EVENTv1,
-			// 	replication.UPDATE_ROWS_EVENTv2:
-			// 	if re, ok := ev.Event.(*replication.RowsEvent); ok {
-			// 		err = psql.processUpdateRow(re)
-			// 		check(err)
-			// 	}
+		// 	}
+		case WRITE_ROWS_EVENTv0,
+			WRITE_ROWS_EVENTv1,
+			WRITE_ROWS_EVENTv2:
+			if re, ok := ev.Event.(*RowsEvent); ok {
+				err = psql.processWriteRow(re)
+				check(err)
+			}
+		case DELETE_ROWS_EVENTv0,
+			DELETE_ROWS_EVENTv1,
+			DELETE_ROWS_EVENTv2:
+			if re, ok := ev.Event.(*RowsEvent); ok {
+				err = psql.processDeleteRow(re)
+				check(err)
+			}
+		case UPDATE_ROWS_EVENTv0,
+			UPDATE_ROWS_EVENTv1,
+			UPDATE_ROWS_EVENTv2:
+			if re, ok := ev.Event.(*RowsEvent); ok {
+				err = psql.processUpdateRow(re)
+				check(err)
+			}
 		}
 	}
 
-	// nextPos := syncer.getNextPosition()
-	// err = writePos(nextPos)
-	// check(err)
+	nextPos := syncer.getNextPosition()
+	err = writePos(nextPos)
+	check(err)
 
 }
 

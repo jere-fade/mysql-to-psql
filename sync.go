@@ -21,7 +21,7 @@ type Syncer struct {
 	Port     uint16
 	User     string
 	Password string
-	tables   map[uint32]*TableMapEvent
+	tables   map[uint64]*TableMapEvent
 }
 
 type Position struct {
@@ -143,10 +143,58 @@ func (s *Syncer) getEvent() (*BinlogEvent, error) {
 	case TABLE_MAP_EVENT:
 		e := &TableMapEvent{flavor: "mysql", tableIDSize: 6}
 		e.parse(bodyBuffer)
-		s.tables[uint32(e.TableID)] = e
+		s.tables[e.TableID] = e
+		return &BinlogEvent{EventHeader: header, Event: e}, nil
+	case WRITE_ROWS_EVENTv0,
+		WRITE_ROWS_EVENTv1,
+		WRITE_ROWS_EVENTv2,
+		DELETE_ROWS_EVENTv0,
+		DELETE_ROWS_EVENTv1,
+		DELETE_ROWS_EVENTv2,
+		UPDATE_ROWS_EVENTv0,
+		UPDATE_ROWS_EVENTv1,
+		UPDATE_ROWS_EVENTv2:
+		e := s.newRowsEvent(&header)
+		e.parse(bodyBuffer)
 		return &BinlogEvent{EventHeader: header, Event: e}, nil
 	}
 
 	return &BinlogEvent{EventHeader: header, Event: e}, nil
 
+}
+
+func (s *Syncer) newRowsEvent(h *EventHeader) *RowsEvent {
+	e := &RowsEvent{}
+
+	e.tableIDSize = 6
+	e.needBitmap2 = false
+	e.tables = s.tables
+	e.eventType = h.EventType
+
+	switch h.EventType {
+	case WRITE_ROWS_EVENTv0:
+		e.Version = 0
+	case UPDATE_ROWS_EVENTv0:
+		e.Version = 0
+	case DELETE_ROWS_EVENTv0:
+		e.Version = 0
+	case WRITE_ROWS_EVENTv1:
+		e.Version = 1
+	case DELETE_ROWS_EVENTv1:
+		e.Version = 1
+	case UPDATE_ROWS_EVENTv1:
+		e.Version = 1
+		e.needBitmap2 = true
+	case WRITE_ROWS_EVENTv2:
+		e.Version = 2
+	case UPDATE_ROWS_EVENTv2:
+		e.Version = 2
+		e.needBitmap2 = true
+	case DELETE_ROWS_EVENTv2:
+		e.Version = 2
+	case PARTIAL_UPDATE_ROWS_EVENT:
+		e.Version = 2
+		e.needBitmap2 = true
+	}
+	return e
 }

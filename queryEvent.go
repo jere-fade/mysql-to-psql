@@ -38,7 +38,7 @@ func (qe *QueryEvent) parse(data []byte) error {
 
 	pos++
 
-	qe.Query = data[pos : len(data)-4]
+	qe.Query = data[pos:]
 
 	return nil
 }

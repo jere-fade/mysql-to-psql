@@ -21,6 +21,7 @@ type Syncer struct {
 	Port     uint16
 	User     string
 	Password string
+	tables   map[uint32]*TableMapEvent
 }
 
 type Position struct {
@@ -129,11 +130,20 @@ func (s *Syncer) getEvent() (*BinlogEvent, error) {
 		return nil, err
 	}
 
+	if header.EventType != FORMAT_DESCRIPTION_EVENT {
+		bodyBuffer = bodyBuffer[0 : len(bodyBuffer)-4]
+	}
+
 	var e Event
 	switch header.EventType {
 	case QUERY_EVENT:
 		e := &QueryEvent{}
 		e.parse(bodyBuffer)
+		return &BinlogEvent{EventHeader: header, Event: e}, nil
+	case TABLE_MAP_EVENT:
+		e := &TableMapEvent{flavor: "mysql", tableIDSize: 6}
+		e.parse(bodyBuffer)
+		s.tables[uint32(e.TableID)] = e
 		return &BinlogEvent{EventHeader: header, Event: e}, nil
 	}
 

@@ -46,6 +46,7 @@ func main() {
 		Port:     mysql_port,
 		User:     mysql_user,
 		Password: mysql_password,
+		tables:   make(map[uint32]*TableMapEvent),
 	}
 
 	err = syncer.syncLog()
@@ -98,7 +99,9 @@ func main() {
 		// 	}
 		case QUERY_EVENT:
 			if qe, ok := ev.Event.(*QueryEvent); ok {
-				err = psql.processQuery(qe)
+				// err = psql.processQuery(qe)
+				fmt.Println(string(qe.Schema))
+				fmt.Println(string(qe.Query))
 				check(err)
 			}
 			// case replication.TABLE_MAP_EVENT:
@@ -130,7 +133,6 @@ func main() {
 	}
 
 	// nextPos := syncer.getNextPosition()
-	// err = writePos(nextPos)
 	// err = writePos(nextPos)
 	// check(err)
 

@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/go-mysql-org/go-mysql v1.7.0
+	github.com/juju/errors v1.0.0
 	github.com/lib/pq v1.2.0
 	github.com/pingcap/tidb/parser v0.0.0-20221126021158-6b02a5d8ba7d
 )

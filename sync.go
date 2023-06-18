@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -73,7 +74,7 @@ func (s *Syncer) getEvent() (*BinlogEvent, error) {
 			if err != nil {
 				return nil, err
 			} else {
-				newLogName := "binlog." + strconv.Itoa(index+1)
+				newLogName := fmt.Sprintf("binlog.%06d", index+1)
 				if _, err = os.Stat(path.Join(logFolder, newLogName)); errors.Is(err, os.ErrNotExist) {
 					return nil, nil
 				} else {

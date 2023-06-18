@@ -6,11 +6,6 @@ import (
 	"os"
 )
 
-type Position struct {
-	Name string
-	Pos  uint32
-}
-
 const fileName = "replication.conf"
 
 func readPos() (*Position, error) {

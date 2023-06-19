@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/lib/pq"
 
 	"github.com/pingcap/tidb/parser"
@@ -28,7 +27,7 @@ var adminPsqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s s
 	pq_defaultDB,
 )
 
-func (pc *PsqlConn) processQuery(qe *replication.QueryEvent) error {
+func (pc *PsqlConn) processQuery(qe *QueryEvent) error {
 	schema := string(qe.Schema)
 	query := string(qe.Query)
 	query = strings.ReplaceAll(query, "`", "")

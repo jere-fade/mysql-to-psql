@@ -2,11 +2,9 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/go-mysql-org/go-mysql/replication"
 )
 
-func (pc *PsqlConn) processDeleteRow(re *replication.RowsEvent) error {
+func (pc *PsqlConn) processDeleteRow(re *RowsEvent) error {
 	tableName := string(re.Table.Table)
 	columnNames := make([]string, 0)
 

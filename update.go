@@ -73,6 +73,7 @@ func (pc *PsqlConn) processUpdateRow(re *RowsEvent) error {
 				return err
 			}
 		}
+		pc.recordCount++
 	}
 	return nil
 }

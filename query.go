@@ -15,8 +15,9 @@ import (
 )
 
 type PsqlConn struct {
-	conn      *sql.DB
-	pq_dbname string
+	conn        *sql.DB
+	pq_dbname   string
+	recordCount int
 }
 
 var adminPsqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
@@ -31,7 +32,6 @@ func (pc *PsqlConn) processQuery(qe *QueryEvent) error {
 	schema := string(qe.Schema)
 	query := string(qe.Query)
 	query = strings.ReplaceAll(query, "`", "")
-	fmt.Println(query)
 
 	if schema == "" {
 		return nil
@@ -101,6 +101,9 @@ func (pc *PsqlConn) processQuery(qe *QueryEvent) error {
 			return pingErr
 		}
 	}
+
+	fmt.Printf("Use database: %s\n", pc.pq_dbname)
+	fmt.Println(query)
 
 	// process the query
 	// if query contain create database, skip

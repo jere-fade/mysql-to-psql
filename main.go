@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 )
 
 const (
@@ -12,7 +13,7 @@ const (
 	mysql_host     = "127.0.0.1"
 	mysql_port     = 3306
 
-	pq_host      = "localhost"
+	pq_host      = "127.0.0.1"
 	pq_port      = 5432
 	pq_defaultDB = "postgres"
 )
@@ -37,6 +38,9 @@ func main() {
 		panic("pq_password not set")
 	}
 
+	fmt.Printf("[MYSQL CONNECTION]       %s@%s:%d\n", mysql_user, mysql_host, mysql_port)
+	fmt.Printf("[POSTGRESQL CONNECTION]  %s@%s:%d\n", pq_user, pq_host, pq_port)
+
 	pos, err := readPos()
 	check(err)
 
@@ -47,25 +51,13 @@ func main() {
 		User:     mysql_user,
 		Password: mysql_password,
 		tables:   make(map[uint64]*TableMapEvent),
+		count:    0,
 	}
+
+	start := time.Now()
 
 	err = syncer.syncLog()
 	check(err)
-
-	// cfg := replication.BinlogSyncerConfig{
-	// 	ServerID: mysql_serverID,
-	// 	Flavor:   flavor,
-	// 	Host:     mysql_host,
-	// 	Port:     mysql_port,
-	// 	User:     mysql_user,
-	// 	Password: mysql_password,
-	// }
-	// syncer := replication.NewBinlogSyncer(cfg)
-	// nextPos := syncer.GetNextPosition()
-
-	// Start sync with specified binlog file and position
-	// streamer, _ := syncer.StartSync(*pos)
-	// streamer, _ := syncer.StartSync(mysql.Position{Name: pos.Name, Pos: pos.Pos})
 
 	// psql connection
 	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
@@ -76,7 +68,7 @@ func main() {
 		pq_defaultDB,
 	)
 
-	psql := &PsqlConn{pq_dbname: pq_defaultDB}
+	psql := &PsqlConn{pq_dbname: pq_defaultDB, recordCount: 0}
 	psql.conn, err = sql.Open("postgres", psqlconn)
 	check(err)
 	defer psql.conn.Close()
@@ -90,22 +82,13 @@ func main() {
 			break
 		}
 
-		// ev.Dump(os.Stdout)
 		switch ev.EventHeader.EventType {
-		// case replication.ROTATE_EVENT:
-		// 	if re, ok := ev.Event.(*replication.RotateEvent); ok {
-		// 		nextPos.Name = string(re.NextLogName)
-		// 		nextPos.Pos = uint32(re.Position)
-		// 	}
+
 		case QUERY_EVENT:
 			if qe, ok := ev.Event.(*QueryEvent); ok {
 				err = psql.processQuery(qe)
 				check(err)
 			}
-		// case replication.TABLE_MAP_EVENT:
-		// 	if tme, ok := ev.Event.(*replication.TableMapEvent); ok {
-
-		// 	}
 		case WRITE_ROWS_EVENTv0,
 			WRITE_ROWS_EVENTv1,
 			WRITE_ROWS_EVENTv2:
@@ -128,7 +111,14 @@ func main() {
 				check(err)
 			}
 		}
+
+		fmt.Printf("Events: %8d, Entries: %8d\n", syncer.count, psql.recordCount)
 	}
+
+	elapsed := time.Since(start).Milliseconds()
+	fmt.Printf("Number of Binlog Events processed: %d\n", syncer.count)
+	fmt.Printf("Number of entries processed: %d\n", psql.recordCount)
+	fmt.Printf("Time used: %d ms\n", elapsed)
 
 	nextPos := syncer.getNextPosition()
 	err = writePos(nextPos)

@@ -22,6 +22,7 @@ func (pc *PsqlConn) processWriteRow(re *RowsEvent) error {
 			}
 		}
 		sqlSlice[i] = "INSERT INTO " + tableName + " VALUES (" + strings.Join(stringValues, ", ") + ");"
+		pc.recordCount++
 	}
 
 	for i := 0; i < len(sqlSlice); i++ {

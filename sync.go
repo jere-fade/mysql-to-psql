@@ -22,6 +22,7 @@ type Syncer struct {
 	User     string
 	Password string
 	tables   map[uint64]*TableMapEvent
+	count    int
 }
 
 type Position struct {
@@ -139,11 +140,13 @@ func (s *Syncer) getEvent() (*BinlogEvent, error) {
 	case QUERY_EVENT:
 		e := &QueryEvent{}
 		e.parse(bodyBuffer)
+		s.count++
 		return &BinlogEvent{EventHeader: header, Event: e}, nil
 	case TABLE_MAP_EVENT:
 		e := &TableMapEvent{flavor: "mysql", tableIDSize: 6}
 		e.parse(bodyBuffer)
 		s.tables[e.TableID] = e
+		s.count++
 		return &BinlogEvent{EventHeader: header, Event: e}, nil
 	case WRITE_ROWS_EVENTv0,
 		WRITE_ROWS_EVENTv1,
@@ -156,6 +159,7 @@ func (s *Syncer) getEvent() (*BinlogEvent, error) {
 		UPDATE_ROWS_EVENTv2:
 		e := s.newRowsEvent(&header)
 		e.parse(bodyBuffer)
+		s.count++
 		return &BinlogEvent{EventHeader: header, Event: e}, nil
 	}
 

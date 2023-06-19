@@ -3,11 +3,9 @@ package main
 import (
 	"fmt"
 	"strings"
-
-	"github.com/go-mysql-org/go-mysql/replication"
 )
 
-func (pc *PsqlConn) processWriteRow(re *replication.RowsEvent) error {
+func (pc *PsqlConn) processWriteRow(re *RowsEvent) error {
 	writeValues := re.Rows
 	tableName := string(re.Table.Table)
 	sqlSlice := make([]string, len(writeValues))

@@ -1,4 +1,4 @@
-package main
+package test
 
 import (
 	"database/sql"
@@ -11,7 +11,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-func main() {
+func Prepare() {
 	rand.Seed(time.Now().UnixNano())
 
 	cfg := mysql.Config{

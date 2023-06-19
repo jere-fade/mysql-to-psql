@@ -1,4 +1,4 @@
-package main
+package replication
 
 import (
 	"bytes"
@@ -20,18 +20,18 @@ type PsqlConn struct {
 	recordCount int
 }
 
-var adminPsqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-	pq_host,
-	pq_port,
-	pq_user,
-	pq_password,
-	pq_defaultDB,
-)
-
-func (pc *PsqlConn) processQuery(qe *QueryEvent) error {
+func (pc *PsqlConn) processQuery(qe *QueryEvent, cfg Config) error {
 	schema := string(qe.Schema)
 	query := string(qe.Query)
 	query = strings.ReplaceAll(query, "`", "")
+
+	var adminPsqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		cfg.Pq_Host,
+		cfg.Pq_port,
+		pq_user,
+		pq_password,
+		cfg.Pq_defaultDB,
+	)
 
 	if schema == "" {
 		return nil
@@ -43,8 +43,8 @@ func (pc *PsqlConn) processQuery(qe *QueryEvent) error {
 		// close old connection, create new connection to psql using 'schema'
 		pc.pq_dbname = schema
 		psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-			pq_host,
-			pq_port,
+			cfg.Pq_Host,
+			cfg.Pq_port,
 			pq_user,
 			pq_password,
 			pc.pq_dbname,
@@ -102,8 +102,8 @@ func (pc *PsqlConn) processQuery(qe *QueryEvent) error {
 		}
 	}
 
-	fmt.Printf("Use database: %s\n", pc.pq_dbname)
-	fmt.Println(query)
+	// fmt.Printf("Use database: %s\n", pc.pq_dbname)
+	// fmt.Println(query)
 
 	// process the query
 	// if query contain create database, skip
@@ -126,10 +126,10 @@ func (pc *PsqlConn) processQuery(qe *QueryEvent) error {
 		}
 		adminPsql.Close()
 
-		pc.pq_dbname = pq_defaultDB
+		pc.pq_dbname = cfg.Pq_defaultDB
 		psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-			pq_host,
-			pq_port,
+			cfg.Pq_Host,
+			cfg.Pq_port,
 			pq_user,
 			pq_password,
 			pc.pq_dbname,

@@ -6,3 +6,4 @@ create.sql
 .gitignore
 update.sql
 log
+result.json

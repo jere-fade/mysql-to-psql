@@ -1,4 +1,4 @@
-package main
+package replication
 
 type BinlogEvent struct {
 	EventHeader EventHeader

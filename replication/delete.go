@@ -1,4 +1,4 @@
-package main
+package replication
 
 import (
 	"fmt"
@@ -41,7 +41,7 @@ func (pc *PsqlConn) processDeleteRow(re *RowsEvent) error {
 			}
 		}
 		pc.recordCount++
-		fmt.Println(deleteSql)
+		// fmt.Println(deleteSql)
 		_, err = pc.conn.Exec(deleteSql)
 		if err != nil {
 			return err

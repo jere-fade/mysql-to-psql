@@ -51,7 +51,7 @@ func (s *Syncer) getDefaultLogPos() (*Position, error) {
 	}
 	pingErr := db.Ping()
 	if pingErr != nil {
-		return nil, err
+		return nil, pingErr
 	}
 
 	var logName string

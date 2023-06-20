@@ -39,11 +39,7 @@ func Replicate(cfg Config) (t int64, err error) {
 	fmt.Printf("[MYSQL CONNECTION]       %s@%s:%d\n", mysql_user, cfg.Mysql_Host, cfg.Mysql_Port)
 	fmt.Printf("[POSTGRESQL CONNECTION]  %s@%s:%d\n", pq_user, cfg.Pq_Host, cfg.Pq_port)
 
-	pos, err := readPos()
-	check(err)
-
 	syncer := &Syncer{
-		Position: *pos,
 		Host:     cfg.Mysql_Host,
 		Port:     cfg.Mysql_Port,
 		User:     mysql_user,
@@ -114,10 +110,6 @@ func Replicate(cfg Config) (t int64, err error) {
 	elapsed := time.Since(start).Milliseconds()
 	fmt.Printf("Number of Binlog Events processed: %d\n", syncer.count)
 	fmt.Printf("Number of entries processed: %d\n", psql.recordCount)
-
-	nextPos := syncer.getNextPosition()
-	err = writePos(nextPos)
-	check(err)
 
 	return elapsed, nil
 

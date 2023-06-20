@@ -6,5 +6,5 @@ create.sql
 .gitignore
 update.sql
 log
-test/*
+test_script/*
 setenv.ps1

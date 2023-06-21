@@ -2,142 +2,73 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"math"
+	"math/rand"
+	rep "mysql-to-psql/replication"
 	"os"
+	"time"
+
+	"github.com/go-sql-driver/mysql"
 )
-
-const (
-	mysql_serverID = 1
-	flavor         = "mysql"
-	mysql_host     = "127.0.0.1"
-	mysql_port     = 3306
-
-	pq_host      = "localhost"
-	pq_port      = 5432
-	pq_defaultDB = "postgres"
-)
-
-var mysql_user = os.Getenv("mysql_user")
-var mysql_password = os.Getenv("mysql_password")
-var pq_user = os.Getenv("pq_user")
-var pq_password = os.Getenv("pq_password")
 
 func main() {
-
-	if mysql_user == "" {
-		panic("mysql_user not set")
-	}
-	if mysql_password == "" {
-		panic("mysql_password not set")
-	}
-	if pq_user == "" {
-		panic("pq_user not set")
-	}
-	if pq_password == "" {
-		panic("pq_password not set")
+	cfg := rep.Config{
+		Mysql_Host:   "127.0.0.1",
+		Mysql_Port:   3306,
+		Pq_Host:      "127.0.0.1",
+		Pq_port:      5432,
+		Pq_defaultDB: "postgres",
 	}
 
-	pos, err := readPos()
-	check(err)
+	rand.Seed(time.Now().UnixNano())
 
-	syncer := &Syncer{
-		Position: *pos,
-		Host:     mysql_host,
-		Port:     mysql_port,
-		User:     mysql_user,
-		Password: mysql_password,
-		tables:   make(map[uint64]*TableMapEvent),
+	performance := make(map[int]int64)
+	performance[100] = 0
+	performance[1000] = 0
+	performance[10000] = 0
+	performance[100000] = 0
+
+	mysql_cfg := mysql.Config{
+		User:   "root",
+		Passwd: "k4aTJCcB4j=+",
+		Net:    "tcp",
+		Addr:   "127.0.0.1:3306",
+		DBName: "homework",
 	}
 
-	err = syncer.syncLog()
-	check(err)
+	var err error
+	db, err := sql.Open("mysql", mysql_cfg.FormatDSN())
+	if err != nil {
+		panic(err)
+	}
 
-	// cfg := replication.BinlogSyncerConfig{
-	// 	ServerID: mysql_serverID,
-	// 	Flavor:   flavor,
-	// 	Host:     mysql_host,
-	// 	Port:     mysql_port,
-	// 	User:     mysql_user,
-	// 	Password: mysql_password,
-	// }
-	// syncer := replication.NewBinlogSyncer(cfg)
-	// nextPos := syncer.GetNextPosition()
-
-	// Start sync with specified binlog file and position
-	// streamer, _ := syncer.StartSync(*pos)
-	// streamer, _ := syncer.StartSync(mysql.Position{Name: pos.Name, Pos: pos.Pos})
-
-	// psql connection
-	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		pq_host,
-		pq_port,
-		pq_user,
-		pq_password,
-		pq_defaultDB,
-	)
-
-	psql := &PsqlConn{pq_dbname: pq_defaultDB}
-	psql.conn, err = sql.Open("postgres", psqlconn)
-	check(err)
-	defer psql.conn.Close()
-
-	for {
-		ev, err := syncer.getEvent()
-
-		if err != nil {
-			check(err)
-		} else if ev == nil {
-			break
-		}
-
-		// ev.Dump(os.Stdout)
-		switch ev.EventHeader.EventType {
-		// case replication.ROTATE_EVENT:
-		// 	if re, ok := ev.Event.(*replication.RotateEvent); ok {
-		// 		nextPos.Name = string(re.NextLogName)
-		// 		nextPos.Pos = uint32(re.Position)
-		// 	}
-		case QUERY_EVENT:
-			if qe, ok := ev.Event.(*QueryEvent); ok {
-				err = psql.processQuery(qe)
-				check(err)
-			}
-		// case replication.TABLE_MAP_EVENT:
-		// 	if tme, ok := ev.Event.(*replication.TableMapEvent); ok {
-
-		// 	}
-		case WRITE_ROWS_EVENTv0,
-			WRITE_ROWS_EVENTv1,
-			WRITE_ROWS_EVENTv2:
-			if re, ok := ev.Event.(*RowsEvent); ok {
-				err = psql.processWriteRow(re)
-				check(err)
-			}
-		case DELETE_ROWS_EVENTv0,
-			DELETE_ROWS_EVENTv1,
-			DELETE_ROWS_EVENTv2:
-			if re, ok := ev.Event.(*RowsEvent); ok {
-				err = psql.processDeleteRow(re)
-				check(err)
-			}
-		case UPDATE_ROWS_EVENTv0,
-			UPDATE_ROWS_EVENTv1,
-			UPDATE_ROWS_EVENTv2:
-			if re, ok := ev.Event.(*RowsEvent); ok {
-				err = psql.processUpdateRow(re)
-				check(err)
+	var score float64
+	var id int
+	for k := range performance {
+		for i := 0; i < k; i++ {
+			id = 100238 + rand.Intn(100000)
+			score = rand.Float64() * 100
+			score = math.Round(score*100) / 100
+			sql := fmt.Sprintf("UPDATE student set score = %f where id=%d", score, id)
+			_, err = db.Exec(sql)
+			if err != nil {
+				panic(err)
 			}
 		}
+		t, _ := rep.Replicate(cfg)
+		fmt.Printf("Record updated: %d, Time used: %d ms\n", k, t)
+		performance[k] = t
 	}
 
-	nextPos := syncer.getNextPosition()
-	err = writePos(nextPos)
-	check(err)
-
-}
-
-func check(e error) {
-	if e != nil {
-		panic(e)
+	content, err := json.MarshalIndent(performance, "", "\t")
+	if err != nil {
+		panic(err)
 	}
+	err = os.WriteFile("result.json", content, 0644)
+	if err != nil {
+		panic(err)
+	}
+
 }

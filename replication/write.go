@@ -1,4 +1,4 @@
-package main
+package replication
 
 import (
 	"fmt"
@@ -22,11 +22,12 @@ func (pc *PsqlConn) processWriteRow(re *RowsEvent) error {
 			}
 		}
 		sqlSlice[i] = "INSERT INTO " + tableName + " VALUES (" + strings.Join(stringValues, ", ") + ");"
+		pc.recordCount++
 	}
 
 	for i := 0; i < len(sqlSlice); i++ {
 		_, err := pc.conn.Exec(sqlSlice[i])
-		fmt.Println(sqlSlice[i])
+		// fmt.Println(sqlSlice[i])
 		if err != nil {
 			return err
 		}

@@ -1,15 +1,20 @@
-package main
+package replication
 
 import (
+	"database/sql"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 const logFolder string = "log"
@@ -22,6 +27,7 @@ type Syncer struct {
 	User     string
 	Password string
 	tables   map[uint64]*TableMapEvent
+	count    int
 }
 
 type Position struct {
@@ -29,8 +35,67 @@ type Position struct {
 	Pos  uint32
 }
 
+const repConfigFileName = "replication.conf"
+
+func (s *Syncer) getDefaultLogPos() (*Position, error) {
+	cfg := mysql.Config{
+		User:                 s.User,
+		Passwd:               s.Password,
+		Addr:                 s.Host + ":" + fmt.Sprintf("%d", s.Port),
+		AllowNativePasswords: true,
+	}
+
+	var err error
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		return nil, err
+	}
+	pingErr := db.Ping()
+	if pingErr != nil {
+		return nil, pingErr
+	}
+
+	var logName string
+	var pos uint32
+	err = db.QueryRow("select JSON_EXTRACT(`LOCAL`, '$.binary_log_file'), JSON_EXTRACT(`LOCAL`, '$.binary_log_position') from performance_schema.log_status").Scan(&logName, &pos)
+	if err != nil {
+		return nil, err
+	}
+	logName = strings.ReplaceAll(logName, "\"", "")
+	return &Position{Name: logName, Pos: pos}, nil
+
+}
+
 func (s *Syncer) syncLog() error {
-	err := os.MkdirAll(logFolder, 0744)
+	if _, err := os.Stat(repConfigFileName); errors.Is(err, os.ErrNotExist) {
+		defaultPos, err := s.getDefaultLogPos()
+		if err != nil {
+			return err
+		}
+		initial := *defaultPos
+		content, err := json.MarshalIndent(initial, "", "\t")
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(repConfigFileName, content, 0644)
+		if err != nil {
+			return err
+		}
+		return errors.New("please set correct binlog file position in replication.conf")
+	}
+
+	data, err := os.ReadFile(repConfigFileName)
+	if err != nil {
+		return err
+	}
+	pos := &Position{}
+	err = json.Unmarshal(data, pos)
+	if err != nil {
+		return err
+	}
+	s.Position = *pos
+
+	err = os.MkdirAll(logFolder, 0744)
 	if err != nil {
 		return err
 	}
@@ -71,12 +136,20 @@ func (s *Syncer) getEvent() (*BinlogEvent, error) {
 	if err != nil {
 		// current log file read to end, judge if next log file exists
 		if err == io.EOF {
-			index, err := strconv.Atoi(strings.ReplaceAll(s.Position.Name, "binlog.", ""))
+			index, err := strconv.Atoi(strings.ReplaceAll(filepath.Ext(s.Position.Name), ".", ""))
 			if err != nil {
 				return nil, err
 			} else {
-				newLogName := fmt.Sprintf("binlog.%06d", index+1)
+				newLogName := fmt.Sprintf("%s.%06d", strings.TrimSuffix(s.Position.Name, filepath.Ext(s.Position.Name)), index+1)
 				if _, err = os.Stat(path.Join(logFolder, newLogName)); errors.Is(err, os.ErrNotExist) {
+					content, err := json.MarshalIndent(s.Position, "", "\t")
+					if err != nil {
+						return nil, err
+					}
+					err = os.WriteFile(repConfigFileName, content, 0644)
+					if err != nil {
+						return nil, err
+					}
 					return nil, nil
 				} else {
 					s.Position.Name = newLogName
@@ -139,11 +212,13 @@ func (s *Syncer) getEvent() (*BinlogEvent, error) {
 	case QUERY_EVENT:
 		e := &QueryEvent{}
 		e.parse(bodyBuffer)
+		s.count++
 		return &BinlogEvent{EventHeader: header, Event: e}, nil
 	case TABLE_MAP_EVENT:
 		e := &TableMapEvent{flavor: "mysql", tableIDSize: 6}
 		e.parse(bodyBuffer)
 		s.tables[e.TableID] = e
+		s.count++
 		return &BinlogEvent{EventHeader: header, Event: e}, nil
 	case WRITE_ROWS_EVENTv0,
 		WRITE_ROWS_EVENTv1,
@@ -156,6 +231,7 @@ func (s *Syncer) getEvent() (*BinlogEvent, error) {
 		UPDATE_ROWS_EVENTv2:
 		e := s.newRowsEvent(&header)
 		e.parse(bodyBuffer)
+		s.count++
 		return &BinlogEvent{EventHeader: header, Event: e}, nil
 	}
 

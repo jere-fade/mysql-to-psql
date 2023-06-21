@@ -39,9 +39,10 @@ const repConfigFileName = "replication.conf"
 
 func (s *Syncer) getDefaultLogPos() (*Position, error) {
 	cfg := mysql.Config{
-		User:   s.User,
-		Passwd: s.Password,
-		Addr:   s.Host + ":" + fmt.Sprintf("%d", s.Port),
+		User:                 s.User,
+		Passwd:               s.Password,
+		Addr:                 s.Host + ":" + fmt.Sprintf("%d", s.Port),
+		AllowNativePasswords: true,
 	}
 
 	var err error
